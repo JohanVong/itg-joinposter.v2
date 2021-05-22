@@ -42,7 +42,7 @@ export default class BonusView extends React.Component {
     };
 
     getTuvisClientInfo = (evt) => {
-        const { language, engVersionSyntax, setTuvisClientNumber, dropCredentials, tuvisTokenErrorMessages } = this.props;
+        const { language, engVersionSyntax, setTuvisClientNumber } = this.props;
         let mobilePhone = evt.target['clientPhone'].value;
         let resData;
 
@@ -53,7 +53,7 @@ export default class BonusView extends React.Component {
             Poster.makeRequest(this.props.tuvisUrl + `/card/card-info-by-card-and-client-phone?card_id=${localStorage.getItem('cardID')}&client_phone=${mobilePhone}`, {
                 headers: [
                     'Content-Type: application/json',
-                    `X-Token: ${localStorage.getItem('X-Token')}`,
+                    `X-Token-Api: ${Poster.settings.extras["tuvisApiToken"]}`,
                     'X-Locale: ' + (language === 'en' ? 'EN' : 'RU')
                 ],
                 method: 'get',
@@ -79,11 +79,6 @@ export default class BonusView extends React.Component {
                     console.log('Ошибка запроса: [add_client]');
                     resData = JSON.parse(answer.result);
                     this.setState({ notice: resData.message });
-                    tuvisTokenErrorMessages.forEach(errMsg => {
-                        if (errMsg === resData.message) {
-                            dropCredentials();
-                        }
-                    })
                 }
             });        
         })
@@ -99,16 +94,15 @@ export default class BonusView extends React.Component {
         this.setState({ notice: '' });
 
         const { bonusToUse, currentClientTuvisBonuses, clientPhone } = this.state;
-        const { language, engVersionSyntax, dropCredentials, setCurrentOrderDiscount, withdrawBonus } = this.props;
+        const { language, engVersionSyntax, setCurrentOrderDiscount, withdrawBonus } = this.props;
 
         Poster.orders.getActive()
         .then((object) => {
             const balance = currentClientTuvisBonuses;
-            const currentBonusCard = localStorage.getItem('cardID');
             const totalSum = object.order.total;
             const reqBody = {
                 AmountFull: totalSum,
-                CardID: Number(currentBonusCard),
+                CardID: 0,
                 ClientPhone: clientPhone,
                 OperationType: "sale",
                 Points: Number(bonusToUse),
@@ -123,7 +117,7 @@ export default class BonusView extends React.Component {
             Poster.makeRequest(this.props.tuvisUrl + `/card/card-info-by-card-and-client-phone?card_id=${localStorage.getItem('cardID')}&client_phone=${clientPhone}`, {
                 headers: [
                     'Content-Type: application/json',
-                    `X-Token: ${localStorage.getItem('X-Token')}`,
+                    `X-Token-Api: ${Poster.settings.extras["tuvisApiToken"]}`,
                     'X-Locale: ' + (language === 'en' ? 'EN' : 'RU')
                 ],
                 method: 'get',
@@ -140,7 +134,7 @@ export default class BonusView extends React.Component {
                             let request = fetch(this.props.tuvisUrl + '/card/transaction/link', {
                                 headers: {
                                     'Content-Type': 'application/json',
-                                    'X-Token': localStorage.getItem('X-Token'),
+                                    'X-Token-Api': Poster.settings.extras["tuvisApiToken"],
                                     'X-Locale': (language === 'en' ? 'EN' : 'RU')
                                 },
                                 method: 'POST',
@@ -155,7 +149,7 @@ export default class BonusView extends React.Component {
                                     } else {
                                         console.log(data.message);
                                         withdrawBonus(bonusToUse);
-                                        setCurrentOrderDiscount(bonusToUse);
+                                        setCurrentOrderDiscount(bonusToUse); // нужно сохранить примененные бонусы в главном состоянии, чтобы зафиксировать её даже при отмене печати чека.
                                         this.setState(initialState);
                                     }
                                 })
@@ -167,7 +161,6 @@ export default class BonusView extends React.Component {
                     }
                 } else {
                     this.setState(initialState);
-                    dropCredentials();
                 }
             });
         })

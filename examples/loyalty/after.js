@@ -13,7 +13,7 @@ export default class AfterView extends React.Component {
     }
 
     giveBonus = () => {
-        const { language, dropCredentials, tuvisClientNumber, tuvisTokenErrorMessages, currentOrderCost } = this.props;
+        const { language, tuvisClientNumber, currentOrderCost } = this.props;
         
         Poster.orders.getActive()
         .then((object) => {
@@ -21,11 +21,10 @@ export default class AfterView extends React.Component {
                 return null
             }
 
-            const currentBonusCard = localStorage.getItem('cardID');
             const totalSum = currentOrderCost;
             const reqBody = {
                 AmountFull: totalSum,
-                CardID: Number(currentBonusCard),
+                CardID: 0,
                 ClientPhone: tuvisClientNumber,
                 OperationType: "sale",
                 Points: 0,
@@ -33,10 +32,10 @@ export default class AfterView extends React.Component {
             }
             let resData;
             
-            Poster.makeRequest(this.props.tuvisUrl + `/card/card-info-by-card-and-client-phone?card_id=${localStorage.getItem('cardID')}&client_phone=${tuvisClientNumber}`, {
+            Poster.makeRequest(this.props.tuvisUrl + `/card/card-info-by-card-and-client-phone?card_id=0&client_phone=${tuvisClientNumber}`, {
                 headers: [
                     'Content-Type: application/json',
-                    `X-Token: ${localStorage.getItem('X-Token')}`,
+                    `X-Token-Api: ${Poster.settings.extras["tuvisApiToken"]}`,
                     'X-Locale: ' + (language === 'en' ? 'EN' : 'RU')
                 ],
                 method: 'get',
@@ -50,7 +49,7 @@ export default class AfterView extends React.Component {
                         let request = fetch(this.props.tuvisUrl + '/card/transaction/link', {
                             headers: {
                                 'Content-Type': 'application/json',
-                                'X-Token': localStorage.getItem('X-Token'),
+                                'X-Token-Api': Poster.settings.extras["tuvisApiToken"],
                                 'X-Locale': (language === 'en' ? 'EN' : 'RU')
                             },
                             method: 'POST',
@@ -79,11 +78,6 @@ export default class AfterView extends React.Component {
                 } else {
                     resData = JSON.parse(answer.result);
                     console.log('Ошибка запроса: [add_bonus-1]');
-                    tuvisTokenErrorMessages.forEach(errMsg => {
-                        if (errMsg === resData.message) {
-                            dropCredentials(true);
-                        }
-                    })
                     this.setState({ result: -1, notice: resData.message });
                 }
             });

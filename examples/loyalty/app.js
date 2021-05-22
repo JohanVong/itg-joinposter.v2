@@ -11,6 +11,7 @@ export default class LoyaltyApp extends React.Component {
         super(props);
 
         this.state = {
+            isNeedToBeReloaded: false,
             isActive: true,
             tuvisClientNumber: null,
             currentOrderCost: null,
@@ -20,13 +21,7 @@ export default class LoyaltyApp extends React.Component {
             place: '', // Доступные варианты: order | beforeOrderClose | afterOrderClose
             tuvisUrl: 'https://api.tuvis.world/api/app-manage-staff',
             uaVersionSyntax: 'ua',
-            tuvisTokenErrorMessages: [
-                "Токен пользователя не найден",
-                "X-Token не указан в заголовках запроса",
-                "User token not found",
-                "X-Token doesn't set in headers"
-            ]
-        };
+        }
     }
 
     componentDidMount() {
@@ -36,15 +31,15 @@ export default class LoyaltyApp extends React.Component {
         // Подписываемся на ивенты Poster
         Poster.on('applicationIconClicked', this.showPopup);
         Poster.on('beforeOrderClose', (data, next) => {
-            let { isActive } = this.state;
+            let { isActive, isNeedToBeReloaded } = this.state;
 
             Poster.orders.getActive()
             .then((object) => {
-                let token = localStorage.getItem('X-Token');
+                let token = Poster.settings.extras["tuvisApiToken"];
 
                 this.setState({ currentOrderCost: object.order.total, currentOrderDiscount: object.order.platformDiscount });
             
-                if (token === '' || token === 'null' || token === null || !isActive || object.order.platformDiscount > 0) {
+                if (token === '' || token === null || token === undefined || !isActive || object.order.platformDiscount > 0 || isNeedToBeReloaded === true) {
                     next();
                 } else {
                     // Сохранили callback чтобы закрыть заказ
@@ -54,13 +49,13 @@ export default class LoyaltyApp extends React.Component {
             })
         });
         Poster.on('afterOrderClose', (data) => {
-            let { isActive, currentOrderDiscount } = this.state;
+            let { isActive, currentOrderDiscount, isNeedToBeReloaded } = this.state;
             
             Poster.orders.getActive()
             .then((object) => {
-                let token = localStorage.getItem('X-Token');
+                let token = Poster.settings.extras["tuvisApiToken"];
             
-                if (token === '' || token === 'null' || token === null || !isActive || object.order.platformDiscount > 0 || currentOrderDiscount > 0) {
+                if (token === '' || token === null || token === undefined || !isActive || object.order.platformDiscount > 0 || currentOrderDiscount > 0 || isNeedToBeReloaded === true) {
                     null
                 } else {
                     this.showPopup({ place: 'afterOrderClose' });
@@ -75,7 +70,7 @@ export default class LoyaltyApp extends React.Component {
         let {isActive} = this.state;
 
         this.setState({ isActive: !isActive });
-    };
+    }
 
     setCurrentOrderDiscount = (number) => {
         this.setState({ currentOrderDiscount: number });
@@ -83,16 +78,10 @@ export default class LoyaltyApp extends React.Component {
 
     setTuvisClientNumber = (tuvisClientNumber) => {
         this.setState({ tuvisClientNumber: tuvisClientNumber });
-    };
+    }
 
-    dropCredentials = (doNotClose) => {
-        localStorage.setItem('X-Token', "");
-        localStorage.setItem('cardID', "");
-        if (doNotClose === true) {
-            null
-        } else {
-            Poster.interface.closePopup();
-        }
+    setReloadNecessity = () => {
+        this.setState({ isNeedToBeReloaded: true });
     }
 
     /**
@@ -110,7 +99,7 @@ export default class LoyaltyApp extends React.Component {
             // Продолжаем стандартный флоу закрытия заказа Poster (показывем окно заказа)
             this.next();
         })
-    };
+    }
 
     /**
      * Показывает интерфейс в зависимости от места в котором интерфейс вызывают
@@ -134,7 +123,7 @@ export default class LoyaltyApp extends React.Component {
     };
 
     render() {
-        const { place, language, engVersionSyntax, uaVersionSyntax, tuvisClientNumber, isActive, tuvisUrl, tuvisTokenErrorMessages, currentOrderCost, currentOrderDiscount } = this.state;
+        const { place, language, engVersionSyntax, uaVersionSyntax, tuvisClientNumber, isActive, tuvisUrl, currentOrderCost } = this.state;
 
         // В зависимости от места в котором вызвали окно интеграции отображаем разные окна
 
@@ -149,6 +138,7 @@ export default class LoyaltyApp extends React.Component {
                 <ClientView
                     isActive={isActive}
                     toggleActivity = {this.toggleActivity}
+                    setReloadNecessity = {this.setReloadNecessity}
                     tuvisUrl={tuvisUrl}
                     language={language}
                     engVersionSyntax={engVersionSyntax}
@@ -162,8 +152,6 @@ export default class LoyaltyApp extends React.Component {
             return (
                 <BonusView
                     tuvisUrl={tuvisUrl}
-                    tuvisTokenErrorMessages={tuvisTokenErrorMessages}
-                    dropCredentials={this.dropCredentials}
                     withdrawBonus={this.withdrawBonus}
                     setCurrentOrderDiscount={this.setCurrentOrderDiscount}
                     setTuvisClientNumber={this.setTuvisClientNumber}
@@ -180,8 +168,6 @@ export default class LoyaltyApp extends React.Component {
                 <AfterView
                     currentOrderCost={currentOrderCost}
                     tuvisUrl={tuvisUrl}
-                    tuvisTokenErrorMessages={tuvisTokenErrorMessages}
-                    dropCredentials={this.dropCredentials}
                     tuvisClientNumber={tuvisClientNumber}
                     language={language}
                     engVersionSyntax={engVersionSyntax}

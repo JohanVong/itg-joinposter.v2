@@ -6,10 +6,8 @@ export default class OrderView extends React.Component {
         super(props);
 
         this.state = {
-            bonusCards: [],
-            businessLogin: '',
-            businessPassword: '',
-            currentCardID: 0,
+            isReset: false,
+            tuvisApiToken: Poster.settings.extras["tuvisApiToken"],
             notice: '',
             stage: 1,
         };
@@ -21,27 +19,31 @@ export default class OrderView extends React.Component {
     };
 
     resetInput = () => {
-        this.setState({ businessLogin: '', businessPassword: '', clientPhone: '' });
+        this.setState({ tuvisApiToken: '' });
     };
 
-    testConnection = (evt) => {
-        const { language, engVersionSyntax } = this.props;
-        let resData, token, promiseJson;
+    updateToken = (evt) => {
+        const { language, engVersionSyntax, setReloadNecessity } = this.props;
+        let promiseJson;
 
         evt.preventDefault();
         this.setState({ stage: -1, notice: '' });
         
         const requestBody = { 
-            Email: evt.target['businessLogin'].value,
-            Password: evt.target['businessPassword'].value 
+            "extras": {
+                "tuvisApiToken": evt.target['tuvisApiToken'].value,
+            }
         }
 
-        console.log(language.toUpperCase());
+        if (requestBody.extras.tuvisApiToken.trim() === "" || requestBody.extras.tuvisApiToken.length > 40) {
+            this.setState({ stage: 1, notice: language === engVersionSyntax ? 'Wrong access key' : 'Неверный ключ доступа' });
+            return
+        }
 
-        let request = fetch(this.props.tuvisUrl + '/user/auth/login', {
+        let request = fetch("https://integrations.tuvis.world/poster/tuvis-token-api/set", {
             headers: {
                 'Content-Type': 'application/json',
-                'X-Locale': (language === 'en' ? 'EN' : 'RU')
+                'X-Poster-Token': Poster.settings.extras["posterAppToken"]
             },
             method: 'POST',
             body: JSON.stringify(requestBody)
@@ -50,33 +52,15 @@ export default class OrderView extends React.Component {
         request
             .then(promise => {
                 promiseJson = promise.json();
-                token = promise.headers.get('x-token');
-                localStorage.setItem('X-Token', token);
 
                 promiseJson
                     .then(data => {
-                        if (data.status === "true") {
+                        if (data.response === true) {
                             this.resetInput();
-                            this.setState({ stage: 0 });
-            
-                            Poster.makeRequest(this.props.tuvisUrl + '/card', {
-                                headers: [
-                                    'Content-Type: application/json',
-                                    'X-Token: ' + token,
-                                    'X-Locale: ' + (language === 'en' ? 'EN' : 'RU')
-                                ],
-                                method: 'get',
-                                timeout: 15000
-                            }, (answer) => {
-                                resData = JSON.parse(answer.result);
-                                if (resData.status === "true") {
-                                    this.setState({ stage: 2, bonusCards: resData.data, currentCardID: resData.data[0].ID });
-                                } else {
-                                    this.setState({ stage: 1, notice: resData.message });
-                                }
-                            });
+                            this.setState({ stage: 2 });
+                            setReloadNecessity(); // нужно поменять флаг внутри главного состояния, чтобы бонусной системой нельзя было пользоваться, после смены ключа доступа.
                         } else {
-                            this.setState({ stage: 1, notice: data.message });
+                            this.setState({ stage: 1, notice: language === engVersionSyntax ? 'Authorization failed' : 'Ошибка авторизации' });
                         }
                     })
                     .catch(err => {
@@ -84,60 +68,27 @@ export default class OrderView extends React.Component {
                     });
             })
             .catch(err => {
-                console.log('Ошибка запроса: [test_conn]');
-                this.setState({ stage: 1, notice: language === engVersionSyntax ? 'Authorization request failed' : 'Ошибка запроса авторизации' });
+                console.log(err);
+                this.setState({ stage: 1, notice: language === engVersionSyntax ? 'Authorization failed' : 'Ошибка авторизации' });
             });
     };
 
-    savePreferences = (evt) => {
-        let { currentCardID } = this.state;
-        evt.preventDefault();
-        const cardID = currentCardID;
-        localStorage.setItem('cardID', cardID)
-        this.setState({ stage: 3 });
-    };
+    isResetToTrue = () => {
+        this.setState({ isReset: true });
+    }
+
+    isResetToFalse = () => {
+        this.setState({ isReset: false });
+    }
 
     render() {
-        let { businessLogin, businessPassword, currentCardID, stage, bonusCards, notice } = this.state;
+        let { tuvisApiToken, stage, notice, isReset } = this.state;
         let { language, engVersionSyntax, isActive, toggleActivity } = this.props;
 
-        // Не используемые для операций переменные
-        // нужные для того, чтобы контролировать состояние
-        let token = localStorage.getItem('X-Token');
-        let cardID = localStorage.getItem('cardID');
+        let token = Poster.settings.extras["tuvisApiToken"].trim();
 
         // Отображаем элементы в зависимости от того, какие данные имеем.
-        if (stage === 2 && bonusCards) {
-            return (
-                <form onSubmit={this.savePreferences}>
-                    {/** using hidden input for IOS 9 input focus and onChange fix **/}
-                    <input type="hidden"/>
-
-                    <div className="row">
-                        <div className="col-xs-12">
-                            <div className="input-group-lg">
-                                <p style={{marginBottom: '1rem'}}>{language === engVersionSyntax ? 'Card to use:' : 'Выберите карту:'}</p>
-                                <select className="col-xs-12" style={{marginBottom: '1rem'}} id="currentCardID" value={currentCardID} onChange={this.updateInput}>
-                                {
-                                    bonusCards.map(card => 
-                                        <option value={card.ID} key={card.ID}> {card.Name} </option>
-                                    )
-                                }                                    
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="footer">
-                        <div className="row">
-                            <div className="col-xs-12">
-                                <button className="btn btn-lg btn-success" type="submit">{language === engVersionSyntax ? 'Select' : 'Выбрать'}</button>
-                            </div>
-                        </div>
-                    </div>
-                </form>
-            );
-        } else if (stage === 3 || token, cardID) {
+        if (token.trim() !== "" && isReset === false) {
             return (
                 <div>
                     {/** using hidden input for IOS 9 input focus and onChange fix **/}
@@ -148,7 +99,7 @@ export default class OrderView extends React.Component {
                             <div className="input-group-lg">
                                 <div style={{textAlign: 'center', color: isActive ? 'black': 'grey'}}>
                                     <p>{language === engVersionSyntax && isActive ? 'Application is active' : language === engVersionSyntax && !isActive ? 'Application is inactive' : language !== engVersionSyntax && isActive ? 'Приложение активно' : language !== engVersionSyntax && !isActive ? 'Приложение не активно' : 'Status unknown'}</p> 
-                                    <p>{language === engVersionSyntax ? 'Click the icon to change' : 'Нажмите на иконку, чтобы изменить'}</p>                                  
+                                    <p>{language === engVersionSyntax ? 'Click the button to change' : 'Нажмите на кнопку, чтобы изменить'}</p>                                  
                                     <button style={{outline: "none", marginTop: "20px"}} className={isActive ? "btn btn-lg btn-success" : "btn btn-lg btn-danger"} onClick={toggleActivity}>TuviS</button>
                                 </div>
                             </div>
@@ -159,6 +110,7 @@ export default class OrderView extends React.Component {
                         <div className="row">
                             <div className="col-xs-12">
                                 <button className="btn btn-lg btn-primary" type="submit" onClick={Poster.interface.closePopup}>{language === engVersionSyntax ? 'Close' : 'Закрыть'}</button>
+                                <button className="btn btn-lg btn-info" style={{marginRight: "20px"}} type="button" onClick={this.isResetToTrue}>{language === engVersionSyntax ? 'Set access key' : 'Ввести ключ доступа'}</button>
                             </div>
                         </div>
                     </div>
@@ -167,18 +119,12 @@ export default class OrderView extends React.Component {
         } else if (stage === -1) {
             return (
                 <div style={{textAlign: 'center', color: 'darkblue'}}>
-                    <h2>{language === engVersionSyntax ? 'Authenticating in TuviS...' : 'Авторизация в Tuvis...'}</h2>
+                    <h2>{language === engVersionSyntax ? 'Loading...' : 'Загрузка...'}</h2>
                 </div>
             );
-        } else if (stage === 0) {
+        } else if (stage === 1) {
             return (
-                <div style={{textAlign: 'center', color: 'darkblue'}}>
-                    <h2>{language === engVersionSyntax ? 'Loading cards...' : 'Загрузка карт...'}</h2>
-                </div>
-            );
-        } else if (stage === 1 || token.length === 0) {
-            return (
-                <form onSubmit={this.testConnection}>
+                <form onSubmit={this.updateToken}>
                     {/** using hidden input for IOS 9 input focus and onChange fix **/}
                     <input type="hidden"/>
 
@@ -186,16 +132,12 @@ export default class OrderView extends React.Component {
                         <div className="col-xs-12">
                             <div className="input-group-lg">
                                 <input
-                                    className="form-control" style={{marginBottom: '1rem'}} type="text" placeholder={language === engVersionSyntax ? 'TuviS work-point login' : "Логин рабочей точки TuviS"}
-                                    id="businessLogin" onChange={this.updateInput} value={businessLogin}
-                                />
-                                <input
-                                    className="form-control" style={{marginBottom: '1rem'}} type="password" placeholder={language === engVersionSyntax ? 'TuviS work-point password' : "Пароль рабочей точки TuviS"}
-                                    id="businessPassword" onChange={this.updateInput} value={businessPassword}
+                                    className="form-control" style={{marginBottom: '1rem'}} type="text" placeholder={language === engVersionSyntax ? 'Enter an access key' : "Введите ключ доступа"}
+                                    id="tuvisApiToken" onChange={this.updateInput} value={tuvisApiToken}
                                 />
                                 <p style={{color: 'orangered', marginTop: 10}}>{notice}</p>
                                 
-                                <button className="btn btn-lg btn-warning col-xs-12" type="submit">{language === engVersionSyntax ? 'Test connection' : 'Тест соединения'}</button>
+                                <button className="btn btn-lg btn-warning col-xs-12" type="submit">{language === engVersionSyntax ? 'Submit' : 'Подтвердить'}</button>
                             </div>
                         </div>
                     </div>
@@ -203,11 +145,17 @@ export default class OrderView extends React.Component {
                     <div className="footer">
                         <div className="row">
                             <div className="col-xs-12">
-                                <button className="btn btn-lg btn-success" disabled type="button">{language === engVersionSyntax ? 'Select' : 'Выбрать'}</button>
+                                <button className="btn btn-lg btn-danger" onClick={this.isResetToFalse} disabled={token.trim() == ""} type="button">{language === engVersionSyntax ? 'Back' : 'Назад'}</button>
                             </div>
                         </div>
                     </div>
                 </form>
+            );
+        } else if (stage == 2) {
+            return (
+                <div style={{textAlign: 'center', color: 'darkgreen'}}>
+                    <h2>{language === engVersionSyntax ? 'Request successful. Application reload is required.' : 'Операция успешна. Требуется перезагрузить приложение.'}</h2>
+                </div>
             );
         } else {
             Poster.interface.closePopup();
