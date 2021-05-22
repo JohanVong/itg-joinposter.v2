@@ -13,6 +13,7 @@ export default class LoyaltyApp extends React.Component {
         this.state = {
             isNeedToBeReloaded: false,
             isActive: true,
+            isSkipped: false,
             tuvisClientNumber: null,
             currentOrderCost: null,
             currentOrderDiscount: null,
@@ -43,20 +44,21 @@ export default class LoyaltyApp extends React.Component {
                     next();
                 } else {
                     // Сохранили callback чтобы закрыть заказ
+                    this.skipToFalse();
                     this.next = next;
                     this.showPopup({ place: 'beforeOrderClose' });
                 }
             })
         });
         Poster.on('afterOrderClose', (data) => {
-            let { isActive, currentOrderDiscount, isNeedToBeReloaded } = this.state;
+            let { isActive, currentOrderDiscount, isNeedToBeReloaded, isSkipped } = this.state;
             
             Poster.orders.getActive()
             .then((object) => {
                 let token = Poster.settings.extras["tuvisApiToken"];
             
-                if (token === '' || token === null || token === undefined || !isActive || object.order.platformDiscount > 0 || currentOrderDiscount > 0 || isNeedToBeReloaded === true) {
-                    null
+                if (token === '' || token === null || token === undefined || !isActive || isSkipped || object.order.platformDiscount > 0 || currentOrderDiscount > 0 || isNeedToBeReloaded === true) {
+                    this.skipToFalse();
                 } else {
                     this.showPopup({ place: 'afterOrderClose' });
                 }
@@ -64,6 +66,15 @@ export default class LoyaltyApp extends React.Component {
 
             this.setState({})
         });
+    }
+
+    skipToTrue = () => {
+        Poster.interface.closePopup();
+        this.setState({ isSkipped: true });
+        this.next();
+    }
+    skipToFalse = () => {
+        this.setState({ isSkipped: false });
     }
 
     toggleActivity = () => {
@@ -152,6 +163,7 @@ export default class LoyaltyApp extends React.Component {
             return (
                 <BonusView
                     tuvisUrl={tuvisUrl}
+                    skipToTrue={this.skipToTrue}
                     withdrawBonus={this.withdrawBonus}
                     setCurrentOrderDiscount={this.setCurrentOrderDiscount}
                     setTuvisClientNumber={this.setTuvisClientNumber}
@@ -166,6 +178,7 @@ export default class LoyaltyApp extends React.Component {
         if (place === 'afterOrderClose') {
             return (
                 <AfterView
+                    toggleSkip={this.toggleSkip}
                     currentOrderCost={currentOrderCost}
                     tuvisUrl={tuvisUrl}
                     tuvisClientNumber={tuvisClientNumber}

@@ -171,6 +171,12 @@ export default class BonusView extends React.Component {
         this.props.withdrawBonus(0);
     };
 
+    invokeSkipping = () => {
+        const { skipToTrue } = this.props;
+
+        skipToTrue();
+    }
+
     componentDidMount() {
         Poster.on('afterPopupClosed', () => {
             this.setState(initialState);
@@ -212,6 +218,7 @@ export default class BonusView extends React.Component {
                         <div className="row">
                             <div className="col-xs-12">
                                 <button className="btn btn-lg btn-success" type="submit">{language === engVersionSyntax ? 'Request balance' : 'Запросить бонусы'}</button>
+                                <button className="btn btn-lg btn-default" onClick={this.invokeSkipping} style={{marginRight: 20}} type="button">{language === engVersionSyntax ? 'Skip' : 'Пропустить'}</button>
                             </div>
                         </div>
                     </div>

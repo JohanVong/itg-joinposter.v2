@@ -1,3 +1,5 @@
+import uiidValidate from 'uuid-validate';
+
 /**
  * Отображает и создает новых клиентов
  * **/
@@ -28,6 +30,11 @@ export default class OrderView extends React.Component {
 
         evt.preventDefault();
         this.setState({ stage: -1, notice: '' });
+
+        if (!uiidValidate(evt.target['tuvisApiToken'].value)) {
+            this.setState({ stage: 1, notice: language === engVersionSyntax ? 'Invalid key format' : 'Неверный формат ключа' });
+            return
+        }
         
         const requestBody = { 
             "extras": {
