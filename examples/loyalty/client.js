@@ -161,7 +161,7 @@ export default class OrderView extends React.Component {
         } else if (stage == 2) {
             return (
                 <div style={{textAlign: 'center', color: 'darkgreen'}}>
-                    <h2>{language === engVersionSyntax ? 'Request successful. Application reload is required.' : 'Операция успешна. Требуется перезагрузить приложение.'}</h2>
+                    <h2>{language === engVersionSyntax ? 'Request successful. Please close this tab and reload the page.' : 'Операция успешна. Пожалуйста, закройте окно и перезагрузите приложение.'}</h2>
                 </div>
             );
         } else {
